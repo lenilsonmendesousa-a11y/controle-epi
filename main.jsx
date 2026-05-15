@@ -1,133 +1,175 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createRoot } from 'react-dom/client';
-import { ShieldCheck, UserPlus, PackagePlus, ClipboardCheck, FileDown, PenLine } from 'lucide-react';
-import './style.css';
+import React, { useEffect, useRef, useState } from 'react'
+import { createRoot } from 'react-dom/client'
+import { ShieldCheck, UserPlus, PackagePlus, ClipboardCheck, Download, PenLine } from 'lucide-react'
+import './style.css'
 
-const initialEmployees = [
+const colaboradoresIniciais = [
   { id: 'COL-001', nome: 'João Silva', funcao: 'Operador de Secador', setor: 'Armazém' },
   { id: 'COL-002', nome: 'Maria Santos', funcao: 'Auxiliar Operacional', setor: 'Silo' },
-];
+]
 
-const initialStock = [
+const estoqueInicial = [
   { id: 'EPI-001', nome: 'Respirador descartável PFF2', ca: 'CA 12345', unidade: 'Unidade', quantidade: 120, minimo: 30 },
   { id: 'EPI-002', nome: 'Luva de vaqueta', ca: 'CA 67890', unidade: 'Par', quantidade: 40, minimo: 10 },
-];
+]
 
-function id(prefix, length) { return `${prefix}-${String(length + 1).padStart(3, '0')}`; }
-function deliveryId(length) { return `ENT-${String(length + 1).padStart(4, '0')}`; }
-
-function load(key, fallback) {
-  try { const saved = localStorage.getItem(key); return saved ? JSON.parse(saved) : fallback; }
-  catch { return fallback; }
+function gerarId(prefixo, tamanho) {
+  return `${prefixo}-${String(tamanho + 1).padStart(3, '0')}`
 }
 
-function SignaturePad({ onSave, signature }) {
-  const canvasRef = useRef(null);
-  const [drawing, setDrawing] = useState(false);
-  const [hasDrawing, setHasDrawing] = useState(false);
+function Assinatura({ aoSalvar }) {
+  const canvasRef = useRef(null)
+  const [desenhando, setDesenhando] = useState(false)
+  const [temAssinatura, setTemAssinatura] = useState(false)
 
-  const ctxData = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return null;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    return { canvas, ctx };
-  };
+  function contexto() {
+    const canvas = canvasRef.current
+    if (!canvas) return null
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    return { canvas, ctx }
+  }
 
-  const pos = (event, canvas) => {
-    const rect = canvas.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
-  };
+  function posicao(e, canvas) {
+    const rect = canvas.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
 
-  const start = (event) => {
-    const data = ctxData(); if (!data) return;
-    event.preventDefault();
-    const { canvas, ctx } = data;
-    const p = pos(event, canvas);
-    canvas.setPointerCapture?.(event.pointerId);
-    ctx.beginPath(); ctx.moveTo(p.x, p.y); setDrawing(true);
-  };
+  function iniciar(e) {
+    const r = contexto()
+    if (!r) return
+    e.preventDefault()
+    const { canvas, ctx } = r
+    const p = posicao(e, canvas)
+    canvas.setPointerCapture?.(e.pointerId)
+    ctx.beginPath()
+    ctx.moveTo(p.x, p.y)
+    setDesenhando(true)
+  }
 
-  const move = (event) => {
-    if (!drawing) return;
-    const data = ctxData(); if (!data) return;
-    event.preventDefault();
-    const { canvas, ctx } = data;
-    const p = pos(event, canvas);
-    ctx.lineWidth = 2; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.lineTo(p.x, p.y); ctx.stroke(); setHasDrawing(true);
-  };
+  function mover(e) {
+    if (!desenhando) return
+    const r = contexto()
+    if (!r) return
+    e.preventDefault()
+    const { canvas, ctx } = r
+    const p = posicao(e, canvas)
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.lineTo(p.x, p.y)
+    ctx.stroke()
+    setTemAssinatura(true)
+  }
 
-  const stop = (event) => { canvasRef.current?.releasePointerCapture?.(event.pointerId); setDrawing(false); };
-  const clear = () => { const data = ctxData(); if (!data) return; data.ctx.clearRect(0,0,data.canvas.width,data.canvas.height); setHasDrawing(false); onSave(''); };
-  const save = () => { const canvas = canvasRef.current; if (!canvas || !hasDrawing) return; onSave(canvas.toDataURL('image/png')); };
+  function parar(e) {
+    const canvas = canvasRef.current
+    canvas?.releasePointerCapture?.(e.pointerId)
+    setDesenhando(false)
+  }
 
-  return <div className="signature-box">
-    <canvas ref={canvasRef} width="760" height="180" onPointerDown={start} onPointerMove={move} onPointerUp={stop} onPointerCancel={stop} onPointerLeave={stop} />
-    <div className="row gap"><button className="secondary" onClick={clear}>Limpar assinatura</button><button onClick={save} disabled={!hasDrawing}><PenLine size={16}/> Salvar assinatura</button>{signature && <span className="badge ok">Assinatura capturada</span>}</div>
-  </div>;
+  function limpar() {
+    const r = contexto()
+    if (!r) return
+    r.ctx.clearRect(0, 0, r.canvas.width, r.canvas.height)
+    setTemAssinatura(false)
+    aoSalvar('')
+  }
+
+  function salvar() {
+    const canvas = canvasRef.current
+    if (!canvas || !temAssinatura) return
+    aoSalvar(canvas.toDataURL('image/png'))
+  }
+
+  return (
+    <div>
+      <canvas ref={canvasRef} width="760" height="180" className="assinatura" onPointerDown={iniciar} onPointerMove={mover} onPointerUp={parar} onPointerCancel={parar} onPointerLeave={parar} />
+      <div className="linha">
+        <button className="secundario" onClick={limpar}>Limpar assinatura</button>
+        <button onClick={salvar} disabled={!temAssinatura}><PenLine size={16}/> Salvar assinatura</button>
+      </div>
+    </div>
+  )
+}
+
+function TabelaEstoque({ estoque }) {
+  return (
+    <div className="tabela">
+      <table>
+        <thead><tr><th>EPI</th><th>CA</th><th>Unidade</th><th>Saldo</th><th>Status</th></tr></thead>
+        <tbody>{estoque.map(e => <tr key={e.id}><td>{e.nome}</td><td>{e.ca}</td><td>{e.unidade}</td><td>{e.quantidade}</td><td>{Number(e.quantidade) <= Number(e.minimo) ? <span className="baixo">Baixo</span> : <span className="ok">OK</span>}</td></tr>)}</tbody>
+      </table>
+    </div>
+  )
 }
 
 function App() {
-  const [tab, setTab] = useState('entrega');
-  const [employees, setEmployees] = useState(() => load('epi_employees', initialEmployees));
-  const [stock, setStock] = useState(() => load('epi_stock', initialStock));
-  const [deliveries, setDeliveries] = useState(() => load('epi_deliveries', []));
-  const [message, setMessage] = useState('');
-  const [empForm, setEmpForm] = useState({ nome: '', funcao: '', setor: '' });
-  const [epiForm, setEpiForm] = useState({ nome: '', ca: '', unidade: 'Unidade', quantidade: '', minimo: '' });
-  const [delivery, setDelivery] = useState({ employeeId: '', epiId: '', quantidade: '1', motivo: 'Entrega de EPI' });
-  const [signature, setSignature] = useState('');
+  const [colaboradores, setColaboradores] = useState(() => JSON.parse(localStorage.getItem('epi_colaboradores') || 'null') || colaboradoresIniciais)
+  const [estoque, setEstoque] = useState(() => JSON.parse(localStorage.getItem('epi_estoque') || 'null') || estoqueInicial)
+  const [entregas, setEntregas] = useState(() => JSON.parse(localStorage.getItem('epi_entregas') || 'null') || [])
+  const [aba, setAba] = useState('entrega')
+  const [mensagem, setMensagem] = useState('')
+  const [assinatura, setAssinatura] = useState('')
+  const [colaborador, setColaborador] = useState({ nome: '', funcao: '', setor: '' })
+  const [epi, setEpi] = useState({ nome: '', ca: '', unidade: 'Unidade', quantidade: '', minimo: '' })
+  const [entrega, setEntrega] = useState({ colaboradorId: '', epiId: '', quantidade: '1', motivo: 'Entrega de EPI' })
 
-  useEffect(() => localStorage.setItem('epi_employees', JSON.stringify(employees)), [employees]);
-  useEffect(() => localStorage.setItem('epi_stock', JSON.stringify(stock)), [stock]);
-  useEffect(() => localStorage.setItem('epi_deliveries', JSON.stringify(deliveries)), [deliveries]);
+  useEffect(() => localStorage.setItem('epi_colaboradores', JSON.stringify(colaboradores)), [colaboradores])
+  useEffect(() => localStorage.setItem('epi_estoque', JSON.stringify(estoque)), [estoque])
+  useEffect(() => localStorage.setItem('epi_entregas', JSON.stringify(entregas)), [entregas])
 
-  const lowStock = useMemo(() => stock.filter(i => Number(i.quantidade) <= Number(i.minimo)), [stock]);
-  const employee = employees.find(e => e.id === delivery.employeeId);
-  const epi = stock.find(e => e.id === delivery.epiId);
+  const colabSelecionado = colaboradores.find(c => c.id === entrega.colaboradorId)
+  const epiSelecionado = estoque.find(e => e.id === entrega.epiId)
+  const estoqueBaixo = estoque.filter(e => Number(e.quantidade) <= Number(e.minimo)).length
 
-  const addEmployee = () => {
-    if (!empForm.nome || !empForm.funcao || !empForm.setor) return setMessage('Preencha nome, função e setor.');
-    setEmployees([...employees, { id: id('COL', employees.length), ...empForm }]);
-    setEmpForm({ nome: '', funcao: '', setor: '' }); setMessage('Colaborador cadastrado com sucesso.');
-  };
-  const addEpi = () => {
-    const q = Number(epiForm.quantidade), m = Number(epiForm.minimo || 0);
-    if (!epiForm.nome || !epiForm.ca || !Number.isFinite(q)) return setMessage('Preencha nome, CA e quantidade.');
-    setStock([...stock, { id: id('EPI', stock.length), ...epiForm, quantidade: q, minimo: m }]);
-    setEpiForm({ nome: '', ca: '', unidade: 'Unidade', quantidade: '', minimo: '' }); setMessage('EPI cadastrado no estoque.');
-  };
-  const register = () => {
-    const q = Number(delivery.quantidade);
-    if (!employee || !epi || !signature || !q || q <= 0 || q > epi.quantidade) return setMessage('Verifique colaborador, EPI, quantidade e assinatura.');
-    const record = { id: deliveryId(deliveries.length), data: new Date().toLocaleString('pt-BR'), colaborador: employee.nome, funcao: employee.funcao, setor: employee.setor, epi: epi.nome, ca: epi.ca, quantidade: q, motivo: delivery.motivo, assinatura: signature };
-    setDeliveries([record, ...deliveries]);
-    setStock(stock.map(item => item.id === epi.id ? { ...item, quantidade: item.quantidade - q } : item));
-    setDelivery({ employeeId: '', epiId: '', quantidade: '1', motivo: 'Entrega de EPI' }); setSignature(''); setMessage('Entrega registrada e estoque baixado.');
-  };
-  const exportCSV = () => {
-    const header = 'ID;Data;Colaborador;Função;Setor;EPI;CA;Quantidade;Motivo\n';
-    const rows = deliveries.map(d => `${d.id};${d.data};${d.colaborador};${d.funcao};${d.setor};${d.epi};${d.ca};${d.quantidade};${d.motivo}`).join('\n');
-    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'controle_entrega_epi.csv'; a.click(); URL.revokeObjectURL(url);
-  };
+  function cadastrarColaborador() {
+    if (!colaborador.nome || !colaborador.funcao || !colaborador.setor) { setMensagem('Preencha nome, função e setor.'); return }
+    setColaboradores([...colaboradores, { id: gerarId('COL', colaboradores.length), ...colaborador }])
+    setColaborador({ nome: '', funcao: '', setor: '' })
+    setMensagem('Colaborador cadastrado com sucesso.')
+  }
 
-  return <main>
-    <header><div><h1>Sistema de Controle de Entrega de EPI</h1><p>Cadastro, estoque, entrega, baixa automática e assinatura eletrônica.</p></div><ShieldCheck size={54}/></header>
-    {message && <section className="notice">{message}</section>}
-    <section className="cards"><div><span>Colaboradores</span><b>{employees.length}</b></div><div><span>Itens em estoque</span><b>{stock.length}</b></div><div><span>Entregas registradas</span><b>{deliveries.length}</b></div><div><span>Estoque baixo</span><b>{lowStock.length}</b></div></section>
-    <nav>{['entrega','estoque','colaboradores','historico'].map(t => <button key={t} className={tab===t?'active':''} onClick={() => setTab(t)}>{t}</button>)}</nav>
+  function cadastrarEpi() {
+    if (!epi.nome || !epi.ca || !epi.quantidade) { setMensagem('Preencha nome do EPI, CA e quantidade.'); return }
+    setEstoque([...estoque, { id: gerarId('EPI', estoque.length), ...epi, quantidade: Number(epi.quantidade), minimo: Number(epi.minimo || 0) }])
+    setEpi({ nome: '', ca: '', unidade: 'Unidade', quantidade: '', minimo: '' })
+    setMensagem('EPI cadastrado no estoque.')
+  }
 
-    {tab === 'entrega' && <section className="panel"><h2>Registrar entrega de EPI</h2><div className="grid4"><select value={delivery.employeeId} onChange={e=>setDelivery({...delivery,employeeId:e.target.value})}><option value="">Colaborador</option>{employees.map(e=><option key={e.id} value={e.id}>{e.nome}</option>)}</select><select value={delivery.epiId} onChange={e=>setDelivery({...delivery,epiId:e.target.value})}><option value="">EPI</option>{stock.map(e=><option key={e.id} value={e.id}>{e.nome} - saldo {e.quantidade}</option>)}</select><input type="number" min="1" value={delivery.quantidade} onChange={e=>setDelivery({...delivery,quantidade:e.target.value})}/><input value={delivery.motivo} onChange={e=>setDelivery({...delivery,motivo:e.target.value})}/></div>{employee&&epi&&<div className="info"><b>Colaborador:</b> {employee.nome} | <b>EPI:</b> {epi.nome} | <b>CA:</b> {epi.ca} | <b>Saldo:</b> {epi.quantidade}</div>}<h3>Assinatura eletrônica do colaborador</h3><SignaturePad onSave={setSignature} signature={signature}/><button onClick={register}><ClipboardCheck size={16}/> Confirmar entrega e baixar estoque</button></section>}
+  function registrarEntrega() {
+    const qtd = Number(entrega.quantidade)
+    if (!colabSelecionado || !epiSelecionado || !qtd || qtd <= 0 || qtd > epiSelecionado.quantidade || !assinatura) { setMensagem('Verifique colaborador, EPI, quantidade disponível e assinatura salva.'); return }
+    const registro = { id: `ENT-${String(entregas.length + 1).padStart(4, '0')}`, data: new Date().toLocaleString('pt-BR'), colaborador: colabSelecionado.nome, funcao: colabSelecionado.funcao, setor: colabSelecionado.setor, epi: epiSelecionado.nome, ca: epiSelecionado.ca, quantidade: qtd, motivo: entrega.motivo, assinatura }
+    setEntregas([registro, ...entregas])
+    setEstoque(estoque.map(item => item.id === epiSelecionado.id ? { ...item, quantidade: item.quantidade - qtd } : item))
+    setEntrega({ colaboradorId: '', epiId: '', quantidade: '1', motivo: 'Entrega de EPI' })
+    setAssinatura('')
+    setMensagem('Entrega registrada e estoque baixado automaticamente.')
+  }
 
-    {tab === 'estoque' && <section className="panel"><h2>Cadastrar EPI no estoque</h2><div className="grid5"><input placeholder="Nome do EPI" value={epiForm.nome} onChange={e=>setEpiForm({...epiForm,nome:e.target.value})}/><input placeholder="Nº do CA" value={epiForm.ca} onChange={e=>setEpiForm({...epiForm,ca:e.target.value})}/><input placeholder="Unidade" value={epiForm.unidade} onChange={e=>setEpiForm({...epiForm,unidade:e.target.value})}/><input type="number" placeholder="Quantidade" value={epiForm.quantidade} onChange={e=>setEpiForm({...epiForm,quantidade:e.target.value})}/><input type="number" placeholder="Estoque mínimo" value={epiForm.minimo} onChange={e=>setEpiForm({...epiForm,minimo:e.target.value})}/></div><button onClick={addEpi}><PackagePlus size={16}/> Adicionar ao estoque</button><table><thead><tr><th>EPI</th><th>CA</th><th>Unidade</th><th>Saldo</th><th>Status</th></tr></thead><tbody>{stock.map(i=><tr key={i.id}><td>{i.nome}</td><td>{i.ca}</td><td>{i.unidade}</td><td>{i.quantidade}</td><td><span className={`badge ${i.quantidade<=i.minimo?'bad':'ok'}`}>{i.quantidade<=i.minimo?'Baixo':'OK'}</span></td></tr>)}</tbody></table></section>}
+  function exportarCSV() {
+    const header = 'ID;Data;Colaborador;Função;Setor;EPI;CA;Quantidade;Motivo\n'
+    const linhas = entregas.map(e => `${e.id};${e.data};${e.colaborador};${e.funcao};${e.setor};${e.epi};${e.ca};${e.quantidade};${e.motivo}`).join('\n')
+    const blob = new Blob([header + linhas], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'controle_entrega_epi.csv'; a.click(); URL.revokeObjectURL(url)
+  }
 
-    {tab === 'colaboradores' && <section className="panel"><h2>Cadastrar colaborador</h2><div className="grid3"><input placeholder="Nome completo" value={empForm.nome} onChange={e=>setEmpForm({...empForm,nome:e.target.value})}/><input placeholder="Função" value={empForm.funcao} onChange={e=>setEmpForm({...empForm,funcao:e.target.value})}/><input placeholder="Setor" value={empForm.setor} onChange={e=>setEmpForm({...empForm,setor:e.target.value})}/></div><button onClick={addEmployee}><UserPlus size={16}/> Cadastrar colaborador</button><div className="list">{employees.map(e=><div key={e.id} className="item"><b>{e.nome}</b><span>{e.funcao} • {e.setor}</span></div>)}</div></section>}
-
-    {tab === 'historico' && <section className="panel"><div className="row between"><h2>Histórico de entregas</h2><button className="secondary" onClick={exportCSV}><FileDown size={16}/> Exportar CSV</button></div>{deliveries.length===0?<p>Nenhuma entrega registrada.</p>:deliveries.map(d=><div className="delivery" key={d.id}><div><b>{d.colaborador}</b><span>{d.data} • {d.funcao} • {d.setor}</span><p><b>EPI:</b> {d.epi} | <b>CA:</b> {d.ca} | <b>Qtd:</b> {d.quantidade}</p></div>{d.assinatura&&<img src={d.assinatura} alt="Assinatura"/>}</div>)}</section>}
-    <footer><b>Observação:</b> biometria real por impressão digital exige leitor biométrico e integração específica. Este sistema usa assinatura eletrônica desenhada na tela.</footer>
-  </main>;
+  return (
+    <main>
+      <header className="topo"><div><h1>Sistema de Controle de Entrega de EPI</h1><p>Cadastro de colaboradores, estoque, entrega, baixa automática e assinatura eletrônica.</p></div><ShieldCheck size={52}/></header>
+      {mensagem && <div className="mensagem">{mensagem}</div>}
+      <section className="cards"><div className="card"><span>Colaboradores</span><strong>{colaboradores.length}</strong></div><div className="card"><span>Itens em estoque</span><strong>{estoque.length}</strong></div><div className="card"><span>Entregas registradas</span><strong>{entregas.length}</strong></div><div className="card"><span>Estoque baixo</span><strong>{estoqueBaixo}</strong></div></section>
+      <nav className="abas"><button onClick={() => setAba('entrega')} className={aba === 'entrega' ? 'ativo' : ''}>Entrega</button><button onClick={() => setAba('estoque')} className={aba === 'estoque' ? 'ativo' : ''}>Estoque</button><button onClick={() => setAba('colaboradores')} className={aba === 'colaboradores' ? 'ativo' : ''}>Colaboradores</button><button onClick={() => setAba('historico')} className={aba === 'historico' ? 'ativo' : ''}>Histórico</button></nav>
+      {aba === 'entrega' && <section className="painel"><h2>Registrar entrega de EPI</h2><div className="grid4"><select value={entrega.colaboradorId} onChange={e => setEntrega({ ...entrega, colaboradorId: e.target.value })}><option value="">Selecione o colaborador</option>{colaboradores.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select><select value={entrega.epiId} onChange={e => setEntrega({ ...entrega, epiId: e.target.value })}><option value="">Selecione o EPI</option>{estoque.map(e => <option key={e.id} value={e.id}>{e.nome} - saldo {e.quantidade}</option>)}</select><input type="number" min="1" placeholder="Quantidade" value={entrega.quantidade} onChange={e => setEntrega({ ...entrega, quantidade: e.target.value })}/><input placeholder="Motivo" value={entrega.motivo} onChange={e => setEntrega({ ...entrega, motivo: e.target.value })}/></div>{colabSelecionado && epiSelecionado && <div className="resumo"><b>Colaborador:</b> {colabSelecionado.nome} | <b>Função:</b> {colabSelecionado.funcao} | <b>Setor:</b> {colabSelecionado.setor}<br/><b>EPI:</b> {epiSelecionado.nome} | <b>CA:</b> {epiSelecionado.ca} | <b>Saldo:</b> {epiSelecionado.quantidade}</div>}<h3>Assinatura eletrônica do colaborador</h3><Assinatura aoSalvar={setAssinatura}/>{assinatura && <span className="badge">Assinatura capturada</span>}<br/><button onClick={registrarEntrega}><ClipboardCheck size={16}/> Confirmar entrega e baixar estoque</button></section>}
+      {aba === 'estoque' && <section className="painel"><h2>Cadastrar EPI no estoque</h2><div className="grid5"><input placeholder="Nome do EPI" value={epi.nome} onChange={e => setEpi({ ...epi, nome: e.target.value })}/><input placeholder="Nº do CA" value={epi.ca} onChange={e => setEpi({ ...epi, ca: e.target.value })}/><input placeholder="Unidade" value={epi.unidade} onChange={e => setEpi({ ...epi, unidade: e.target.value })}/><input type="number" placeholder="Quantidade" value={epi.quantidade} onChange={e => setEpi({ ...epi, quantidade: e.target.value })}/><input type="number" placeholder="Estoque mínimo" value={epi.minimo} onChange={e => setEpi({ ...epi, minimo: e.target.value })}/></div><button onClick={cadastrarEpi}><PackagePlus size={16}/> Adicionar ao estoque</button><TabelaEstoque estoque={estoque}/></section>}
+      {aba === 'colaboradores' && <section className="painel"><h2>Cadastrar colaborador</h2><div className="grid3"><input placeholder="Nome completo" value={colaborador.nome} onChange={e => setColaborador({ ...colaborador, nome: e.target.value })}/><input placeholder="Função" value={colaborador.funcao} onChange={e => setColaborador({ ...colaborador, funcao: e.target.value })}/><input placeholder="Setor" value={colaborador.setor} onChange={e => setColaborador({ ...colaborador, setor: e.target.value })}/></div><button onClick={cadastrarColaborador}><UserPlus size={16}/> Cadastrar colaborador</button><div className="lista">{colaboradores.map(c => <div className="item" key={c.id}><b>{c.nome}</b><br/><span>{c.funcao} • {c.setor}</span></div>)}</div></section>}
+      {aba === 'historico' && <section className="painel"><div className="linha espacada"><h2>Histórico de entregas</h2><button className="secundario" onClick={exportarCSV}><Download size={16}/> Exportar CSV</button></div>{entregas.length === 0 && <p>Nenhuma entrega registrada.</p>}<div className="lista">{entregas.map(e => <div className="item historico" key={e.id}><div><b>{e.colaborador}</b><br/><span>{e.data} • {e.funcao} • {e.setor}</span><br/><span><b>EPI:</b> {e.epi} | <b>CA:</b> {e.ca} | <b>Qtd:</b> {e.quantidade}</span></div>{e.assinatura && <img src={e.assinatura} alt="Assinatura"/>}</div>)}</div></section>}
+      <footer><b>Observação técnica:</b> biometria real por impressão digital exige leitor biométrico e integração própria. Este modelo usa assinatura eletrônica desenhada na tela.</footer>
+    </main>
+  )
 }
 
-createRoot(document.getElementById('root')).render(<App />);
+createRoot(document.getElementById('root')).render(<App />)
